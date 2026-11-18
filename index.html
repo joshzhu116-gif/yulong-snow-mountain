@@ -7186,6 +7186,8 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
       yaw: 0,
       pitch: 0.16,
       dist: 9.5,
+      trainYaw: 0,
+      trainPitch: -0.02,
       currentPos: new THREE.Vector3(0, 6, 38),
       currentLookAt: new THREE.Vector3(0, 2.3, 0)
     },
@@ -7675,45 +7677,220 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
     }
   });
 
+  // Build Hollow 360° Panoramic Glass Sightseeing Carriages (全透明前挡风玻璃观光车厢 + 低矮复古蒸汽机头)
+  const trainWoodMat = new THREE.MeshStandardMaterial({ color: 0x5c2d16, roughness: 0.42, metalness: 0.12 });
+  const trainDarkIronMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.65 });
+  const trainBrassMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.22, metalness: 0.88 });
+  const trainCrimsonMat = new THREE.MeshStandardMaterial({ color: 0x9f1239, roughness: 0.52, metalness: 0.08 });
+  const trainCushionMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.62 });
+  // Crystal-clear panoramic glass material (depthWrite: false so it never blocks mountains, lake, trees, or snow)
+  const panoramicGlassMat = new THREE.MeshStandardMaterial({
+    color: 0xe0f7ff,
+    transparent: true,
+    opacity: 0.12,
+    roughness: 0.06,
+    metalness: 0.18,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const glassGlintMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+
+  function buildPanoramicGlassCabin(car, idx) {
+    const cabin = new THREE.Group();
+
+    // 1) Steel Underframe & Mahogany Floor Deck (y = 0.32 .. 0.42, well above rotating wheels)
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.08, 2.44), trainDarkIronMat);
+    chassis.position.set(0, 0.36, 0);
+    chassis.castShadow = true;
+    chassis.receiveShadow = true;
+    cabin.add(chassis);
+
+    const floorDeck = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.04, 2.38), trainWoodMat);
+    floorDeck.position.set(0, 0.42, 0);
+    floorDeck.receiveShadow = true;
+    cabin.add(floorDeck);
+
+    // Brass floor perimeter trim
+    const brassTrim = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.03, 2.46), trainBrassMat);
+    brassTrim.position.set(0, 0.40, 0);
+    cabin.add(brassTrim);
+
+    // 2) Low Waist Panels (y = 0.42 .. 0.65, strictly below seated passenger eye level y = 1.04!)
+    // Left & Right low wooden waist walls
+    [-0.58, 0.58].forEach(wx => {
+      const sideWaist = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.23, 2.36), trainCrimsonMat);
+      sideWaist.position.set(wx, 0.535, 0);
+      sideWaist.castShadow = true;
+      cabin.add(sideWaist);
+
+      const sideSill = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.03, 2.40), trainWoodMat);
+      sideSill.position.set(wx, 0.655, 0);
+      cabin.add(sideSill);
+
+      const sideBrass = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 2.38), trainBrassMat);
+      sideBrass.position.set(wx, 0.54, 0);
+      cabin.add(sideBrass);
+    });
+
+    // Front & Rear low waist panels (top at y = 0.65 so y = 0.66..1.36 is 100% transparent glass!)
+    [-1.18, 1.18].forEach((wz, fIdx) => {
+      const endWaist = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.23, 0.04), trainCrimsonMat);
+      endWaist.position.set(0, 0.535, wz);
+      endWaist.castShadow = true;
+      cabin.add(endWaist);
+
+      // Front viewing counter / windowsill (wider shelf at front z = +1.14 for sightseeing passengers)
+      const sillDepth = fIdx === 1 ? 0.14 : 0.07;
+      const sillZ = fIdx === 1 ? wz - 0.04 : wz;
+      const endSill = new THREE.Mesh(new THREE.BoxGeometry(1.20, 0.035, sillDepth), trainWoodMat);
+      endSill.position.set(0, 0.655, sillZ);
+      cabin.add(endSill);
+
+      const endBrass = new THREE.Mesh(new THREE.BoxGeometry(1.21, 0.025, 0.05), trainBrassMat);
+      endBrass.position.set(0, 0.54, wz);
+      cabin.add(endBrass);
+    });
+
+    // 3) Interior Cushioned Benches & Sightseeing Details (y = 0.44 .. 0.60)
+    [-0.41, 0.41].forEach(bx => {
+      const seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.08, 1.85), trainWoodMat);
+      seatBase.position.set(bx, 0.48, -0.05);
+      cabin.add(seatBase);
+
+      const seatCushion = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 1.82), trainCushionMat);
+      seatCushion.position.set(bx, 0.54, -0.05);
+      cabin.add(seatCushion);
+    });
+
+    // Small decorative brass sighting bell on the right side of the front windowsill (out of center sightline)
+    const miniBell = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.06, 12), trainBrassMat);
+    miniBell.position.set(0.44, 0.70, 1.12);
+    cabin.add(miniBell);
+
+    // 4) Slim Corner & Side Mahogany-Brass Pillars (x = ±0.575, completely clear of center view x = 0!)
+    const pillarCoords = [
+      [-0.575, 1.175], [0.575, 1.175],
+      [-0.575, 0.0],   [0.575, 0.0],
+      [-0.575, -1.175],[0.575, -1.175]
+    ];
+    pillarCoords.forEach(([px, pz]) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 0.72, 10), trainWoodMat);
+      post.position.set(px, 1.02, pz);
+      cabin.add(post);
+
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.030, 0.030, 0.04, 10), trainBrassMat);
+      ring.position.set(px, 0.72, pz);
+      cabin.add(ring);
+    });
+
+    // 5) FULL-WIDTH TRANSPARENT FRONT PANORAMIC GLASS WINDSHIELD (z = +1.18, y = 0.67 .. 1.36)
+    const frontGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 0.69), panoramicGlassMat);
+    frontGlass.position.set(0, 1.015, 1.18);
+    cabin.add(frontGlass);
+
+    // Subtle corner glass reflection diagonal strips on front glass so the player perceives real glass
+    [-0.44, 0.44].forEach(gx => {
+      const glint = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.22), glassGlintMat);
+      glint.position.set(gx, 1.21, 1.182);
+      glint.rotation.z = -0.35;
+      cabin.add(glint);
+    });
+
+    // Rear Panoramic Glass Window (z = -1.18)
+    const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 0.69), panoramicGlassMat);
+    rearGlass.position.set(0, 1.015, -1.18);
+     cabin.add(rearGlass);
+
+    // Left & Right Panoramic Glass Windows (x = ±0.58)
+    [-0.58, 0.58].forEach(sx => {
+      const sideGlass = new THREE.Mesh(new THREE.PlaneGeometry(2.32, 0.69), panoramicGlassMat);
+      sideGlass.rotation.y = Math.PI / 2;
+      sideGlass.position.set(sx, 1.015, 0);
+      cabin.add(sideGlass);
+    });
+
+    // 6) Panoramic Glass Skylight Roof Frame (y = 1.37, open transparent glass dome overhead!)
+    [-0.575, 0.575].forEach(rx => {
+      const roofSideBeam = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 2.42), trainWoodMat);
+      roofSideBeam.position.set(rx, 1.37, 0);
+      cabin.add(roofSideBeam);
+    });
+    [-1.18, 1.18].forEach((rz) => {
+      const roofEndBeam = new THREE.Mesh(new THREE.BoxGeometry(1.20, 0.045, 0.05), trainWoodMat);
+      roofEndBeam.position.set(0, 1.37, rz);
+      cabin.add(roofEndBeam);
+
+      const roofEndBrass = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.02, 0.06), trainBrassMat);
+      roofEndBrass.position.set(0, 1.395, rz);
+      cabin.add(roofEndBrass);
+    });
+
+    // Transparent Skylight Glass Roof Panel
+    const roofGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 2.32), panoramicGlassMat);
+    roofGlass.rotation.x = Math.PI / 2;
+    roofGlass.position.set(0, 1.38, 0);
+    cabin.add(roofGlass);
+
+    // 7) Lead Carriage (idx === 0): Low-Profile Vintage Steam Locomotive Nose BELOW the front glass window!
+    // Kept strictly at y = 0.36 .. 0.62 (below the y = 0.66 front glass sill) so forward view is 100% clear!
+    if (idx === 0) {
+      const noseBoiler = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.46, 16), trainDarkIronMat);
+      noseBoiler.rotation.x = Math.PI / 2;
+      noseBoiler.position.set(0, 0.48, 1.42);
+      noseBoiler.castShadow = true;
+      cabin.add(noseBoiler);
+
+      const noseBand = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.018, 8, 20), trainBrassMat);
+      noseBand.position.set(0, 0.48, 1.52);
+      cabin.add(noseBand);
+
+      const headlamp = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.12, 14), trainBrassMat);
+      headlamp.rotation.x = Math.PI / 2;
+      headlamp.position.set(0, 0.52, 1.66);
+      cabin.add(headlamp);
+
+      // Side-mounted vintage brass steam stack (at x = -0.52 so center forward glass sightline is 100% unobstructed)
+      const sideStack = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.34, 12), trainDarkIronMat);
+      sideStack.position.set(-0.52, 0.72, 1.38);
+      cabin.add(sideStack);
+
+      const stackCrown = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.018, 8, 16), trainBrassMat);
+      stackCrown.rotation.x = Math.PI / 2;
+      stackCrown.position.set(-0.52, 0.89, 1.38);
+      cabin.add(stackCrown);
+    }
+
+    car.add(cabin);
+  }
+
   ['train_head', 'train_car_a', 'train_car_b'].forEach((key, idx) => {
     loadEmbeddedGLB(key, gltf => {
       const car = gltf.scene;
       car.scale.set(2.5, 2.5, 2.5);
       car.traverse(c => {
         if (c.isMesh) {
-          c.castShadow = true;
-          c.receiveShadow = true;
-        }
-        if (c.name && (c.name.startsWith('wheel') || c.name.includes('wheels'))) {
-          trainWheelNodes.push(c);
+          const isWheel = c.name && (c.name.startsWith('wheel') || c.name.includes('wheels'));
+          if (isWheel) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+            trainWheelNodes.push(c);
+          } else {
+            // Hide the opaque solid GLB block body so our hollow Panoramic Glass Sightseeing Cabin replaces it!
+            c.visible = false;
+          }
         }
       });
 
-      if (idx === 0) {
-        const brassMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.85, roughness: 0.2 });
-        const blackIronMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6, roughness: 0.35 });
-
-        const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.11, 0.45, 16), blackIronMat);
-        chimney.position.set(0, 1.55, 0.72);
-        car.add(chimney);
-
-        const chimneyCrown = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 10, 20), brassMat);
-        chimneyCrown.rotation.x = Math.PI / 2;
-        chimneyCrown.position.set(0, 1.77, 0.72);
-        car.add(chimneyCrown);
-
-        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), brassMat);
-        dome.position.set(0, 1.42, 0.22);
-        car.add(dome);
-
-        const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.14, 14), brassMat);
-        lamp.rotation.x = Math.PI / 2;
-        lamp.position.set(0, 1.15, 1.05);
-        car.add(lamp);
-      }
+      buildPanoramicGlassCabin(car, idx);
 
       const cabinLight = new THREE.PointLight(0xffedd5, 1.6, 12);
-      cabinLight.position.set(0, 1.2, 0);
+      cabinLight.position.set(0, 1.15, 0);
       car.add(cabinLight);
 
       scene.add(car);
@@ -9724,8 +9901,13 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
       const dy = e.clientY - prev.y;
       prev.x = e.clientX;
       prev.y = e.clientY;
-      STATE.cam.yaw -= dx * 0.0055;
-      STATE.cam.pitch = THREE.MathUtils.clamp(STATE.cam.pitch + dy * 0.004, 0.03, 0.72);
+      if (STATE.mode === 'train' && STATE.trainCameraInside) {
+        STATE.cam.trainYaw += dx * 0.0055;
+        STATE.cam.trainPitch = THREE.MathUtils.clamp(STATE.cam.trainPitch - dy * 0.004, -0.52, 0.55);
+      } else {
+        STATE.cam.yaw -= dx * 0.0055;
+        STATE.cam.pitch = THREE.MathUtils.clamp(STATE.cam.pitch + dy * 0.004, 0.03, 0.72);
+      }
     } else if (canvasPointers.size === 2) {
       prev.x = e.clientX;
       prev.y = e.clientY;
@@ -9773,7 +9955,9 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
       trainBar.classList.remove('hidden');
       hikerContainer.visible = false;
       STATE.cam.dist = 15.5;
-      showToast('🚂 已登上玉龙雪山复古蒸汽小火车 · 正在沿蓝月谷湖岸与纳西古村巡游');
+      STATE.cam.trainYaw = 0;
+      STATE.cam.trainPitch = -0.02;
+      showToast('🚂 已登上玉龙雪山全景透明玻璃观光车厢 · 可随时切换车内第一人称视角');
     } else {
       if (joystickZone) joystickZone.classList.remove('hidden');
       btnTrain.classList.remove('train-active');
@@ -9795,6 +9979,13 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
 
   document.getElementById('btn-train-camera').addEventListener('click', e => {
     STATE.trainCameraInside = !STATE.trainCameraInside;
+    if (STATE.trainCameraInside) {
+      STATE.cam.trainYaw = 0;
+      STATE.cam.trainPitch = -0.02;
+      showToast('🪟 已进入全景玻璃观光车厢第一人称 · 滑动屏幕或鼠标可 360° 透过玻璃赏景');
+    } else {
+      showToast('🎥 已切换为蒸汽小火车车厢外跟拍视角');
+    }
     e.currentTarget.textContent = STATE.trainCameraInside ? '🎥 切换车厢外跟拍视角' : '🪟 切换车窗内第一人称';
   });
 
@@ -10055,6 +10246,7 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
       car.position.copy(pt);
       car.position.y += 0.10;
       car.lookAt(nextPt);
+      car.updateMatrixWorld(true);
     });
 
     trainWheelNodes.forEach(w => {
@@ -10063,21 +10255,22 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
 
     if (trainCarriages[0]) {
       const loco = trainCarriages[0];
-      const stackWorldPos = new THREE.Vector3(0, 1.82, 0.72).applyMatrix4(loco.matrixWorld);
+      const stackWorldPos = new THREE.Vector3(-0.52, 0.92, 1.38).applyMatrix4(loco.matrixWorld);
       steamPuffs.forEach(sp => {
         sp.age += dt * (0.6 + STATE.trainSpeedMult * 0.6);
         if (sp.age >= sp.maxAge) {
           sp.age = 0;
           sp.mesh.position.copy(stackWorldPos);
-          sp.mesh.position.x += sp.offsetX;
-          sp.mesh.position.z += sp.offsetZ;
+          sp.mesh.position.x += sp.offsetX * 0.6;
+          sp.mesh.position.z += sp.offsetZ * 0.6;
         } else {
           const progress = sp.age / sp.maxAge;
           sp.mesh.position.y += dt * 3.2;
-          sp.mesh.position.x += Math.sin(elapsed * 2 + sp.offsetX * 10) * dt * 0.6;
-          const sc = 0.45 + progress * 2.1;
+          sp.mesh.position.x += Math.sin(elapsed * 2 + sp.offsetX * 10) * dt * 0.5;
+          const sc = 0.32 + progress * 1.45;
           sp.mesh.scale.set(sc, sc * 0.85, sc);
-          sp.mesh.material.opacity = Math.sin(progress * Math.PI) * 0.62;
+          const maxOp = STATE.trainCameraInside ? 0.22 : 0.55;
+          sp.mesh.material.opacity = Math.sin(progress * Math.PI) * maxOp;
         }
       });
     }
@@ -10174,17 +10367,30 @@ window.EMBEDDED_TEXTURES = {"grass": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
       camera.position.copy(STATE.cam.currentPos);
       camera.lookAt(STATE.cam.currentLookAt);
     } else if (STATE.mode === 'train' && trainCarriages[0]) {
-      const carPos = trainCarriages[0].position;
+      const loco = trainCarriages[0];
+      const carPos = loco.position;
       if (STATE.trainCameraInside) {
-        const insidePos = carPos.clone().add(new THREE.Vector3(0, 2.5, 0));
-        const lookTarget = new THREE.Vector3(
-          insidePos.x - Math.sin(STATE.cam.yaw) * 40,
-          insidePos.y + 4 - Math.sin(STATE.cam.pitch) * 18,
-          insidePos.z - Math.cos(STATE.cam.yaw) * 40
+        // Optional keyboard look-around while seated inside the panoramic glass carriage
+        const lookTurn = (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
+        const lookTilt = (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0) - (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0);
+        if (lookTurn !== 0) STATE.cam.trainYaw += lookTurn * dt * 1.4;
+        if (lookTilt !== 0) STATE.cam.trainPitch = THREE.MathUtils.clamp(STATE.cam.trainPitch + lookTilt * dt * 1.0, -0.52, 0.55);
+
+        // Lock camera directly inside the Panoramic Glass Sightseeing Carriage (local y=1.03, z=0.36)
+        // Looking straight through the full-width transparent front glass windshield (at z=1.18) with zero lag!
+        const localEye = new THREE.Vector3(0, 1.03, 0.36);
+        const localLookTarget = new THREE.Vector3(
+          -Math.sin(STATE.cam.trainYaw) * Math.cos(STATE.cam.trainPitch) * 20,
+          1.03 + Math.sin(STATE.cam.trainPitch) * 20,
+          0.36 + Math.cos(STATE.cam.trainYaw) * Math.cos(STATE.cam.trainPitch) * 20
         );
-        camera.position.lerp(insidePos, 0.25);
-        STATE.cam.currentLookAt.lerp(lookTarget, 0.2);
-        camera.lookAt(STATE.cam.currentLookAt);
+        const worldEye = localEye.applyMatrix4(loco.matrixWorld);
+        const worldLookTarget = localLookTarget.applyMatrix4(loco.matrixWorld);
+
+        camera.position.copy(worldEye);
+        STATE.cam.currentPos.copy(worldEye);
+        STATE.cam.currentLookAt.copy(worldLookTarget);
+        camera.lookAt(worldLookTarget);
       } else {
         const desiredCamPos = new THREE.Vector3(
           carPos.x + Math.sin(STATE.cam.yaw) * Math.cos(STATE.cam.pitch) * STATE.cam.dist,
